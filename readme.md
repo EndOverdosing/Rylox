@@ -1,4 +1,4 @@
-![Rylox Logo](/static/images/githb-banner.png)
+![Rylox Logo](/static/images/github-banner.png)
 
 # Rylox - SoundCloud Downloader
 
