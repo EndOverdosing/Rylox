@@ -35,18 +35,12 @@ def get_formatted_filename(custom_format, info):
 @app.route('/download', methods=['POST'])
 def download():
     data = request.get_json()
-    if not data:
+    if not data or not data.get('url') or 'soundcloud.com' not in data.get('url'):
         return jsonify({"success": False, "error": "Invalid request."}), 400
 
     url = data.get('url')
     quality = data.get('quality', '192')
     custom_format = data.get('custom_format')
-
-    if not url:
-        return jsonify({"success": False, "error": "URL is required."}), 400
-
-    if 'soundcloud.com' not in url:
-        return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
 
     try:
         with yt_dlp.YoutubeDL({'nopart': True}) as ydl:
@@ -56,26 +50,23 @@ def download():
             safe_title = get_formatted_filename(custom_format, info)
         else:
             safe_title = sanitize_filename(info.get('title', 'untitled_audio'))
-        
+
         if not safe_title:
              safe_title = sanitize_filename(info.get('id', 'untitled_audio'))
 
         output_template = os.path.join(DOWNLOADS_FOLDER, safe_title)
-        
+
         if sys.platform == "win32":
             ffmpeg_exe_path = r'C:\ProgramData\chocolatey\bin\ffmpeg.exe'
         else:
-            ffmpeg_exe_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'bin', 'ffmpeg'))
+
+            ffmpeg_exe_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'ffmpeg'))
 
         ydl_opts = {
             'outtmpl': output_template,
             'ffmpeg_location': ffmpeg_exe_path,
             'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': quality,
-            }],
+            'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': quality}],
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -89,7 +80,7 @@ def download():
 
         with open(final_filepath, 'rb') as f:
             binary_data = f.read()
-        
+
         os.remove(final_filepath)
 
         base64_data = base64.b64encode(binary_data).decode('utf-8')
@@ -102,7 +93,7 @@ def download():
             "title": info.get("title", "Untitled"),
             "thumbnail": info.get("thumbnail"),
             "uploader": info.get("uploader", "N/A"),
-            "duration": info.get("duration", 0)
+            "duration": info.get("duration",0)
         })
 
     except Exception as e:
