@@ -5,7 +5,7 @@ import logging
 import re
 import base64
 import sys
-import tempfile 
+import tempfile
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -56,15 +56,16 @@ def download():
             safe_title = get_formatted_filename(custom_format, info)
         else:
             safe_title = sanitize_filename(info.get('title', 'untitled_audio'))
-
+        
         if not safe_title:
              safe_title = sanitize_filename(info.get('id', 'untitled_audio'))
 
         output_template = os.path.join(DOWNLOADS_FOLDER, safe_title)
-
-        ffmpeg_exe_path = r'C:\ProgramData\chocolatey\bin\ffmpeg.exe'
-        if sys.platform != "win32":
-            ffmpeg_exe_path = 'ffmpeg'
+        
+        if sys.platform == "win32":
+            ffmpeg_exe_path = r'C:\ProgramData\chocolatey\bin\ffmpeg.exe'
+        else:
+            ffmpeg_exe_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'bin', 'ffmpeg'))
 
         ydl_opts = {
             'outtmpl': output_template,
@@ -88,18 +89,11 @@ def download():
 
         with open(final_filepath, 'rb') as f:
             binary_data = f.read()
-
+        
         os.remove(final_filepath)
 
         base64_data = base64.b64encode(binary_data).decode('utf-8')
         download_url = f"data:audio/mpeg;base64,{base64_data}"
-
-        duration_seconds = info.get("duration")
-        duration_str = "N/A"
-        if duration_seconds:
-            m, s = divmod(duration_seconds, 60)
-            h, m = divmod(m, 60)
-            duration_str = f"{int(h):02d}:{int(m):02d}:{int(s):02d}" if h > 0 else f"{int(m):02d}:{int(s):02d}"
 
         return jsonify({
             "success": True,
@@ -108,7 +102,7 @@ def download():
             "title": info.get("title", "Untitled"),
             "thumbnail": info.get("thumbnail"),
             "uploader": info.get("uploader", "N/A"),
-            "duration": duration_str
+            "duration": info.get("duration", 0)
         })
 
     except Exception as e:
