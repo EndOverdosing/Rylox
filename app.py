@@ -1,50 +1,97 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory, render_template_string
 import os
 import yt_dlp
 import logging
 import re
-import base64
-import sys
-import tempfile
+from urllib.parse import quote
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
-DOWNLOADS_FOLDER = os.path.join(tempfile.gettempdir(), 'rylox_downloads')
-if not os.path.exists(DOWNLOADS_FOLDER):
-    os.makedirs(DOWNLOADS_FOLDER)
+STATIC_FOLDER = 'static'
+DOWNLOADS_FOLDER = os.path.join(STATIC_FOLDER, 'downloads')
+
+for subfolder in ['js', 'styling', 'images', 'downloads']:
+    path = os.path.join(STATIC_FOLDER, subfolder)
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+@app.route('/')
+def home():
+    """Serves the main HTML page."""
+    try:
+        with open('index.html', encoding='utf-8') as f:
+            return render_template_string(f.read())
+    except FileNotFoundError:
+        return "index.html not found.", 404
+
+@app.route('/favicon.ico')
+def favicon():
+    """Serves the favicon."""
+    return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
+                               'icon.png', mimetype='image/png')
 
 def sanitize_filename(filename):
+    """Removes illegal characters from a filename."""
     return re.sub(r'[\\/*?:"<>|]', "", filename).strip()
 
 def get_formatted_filename(custom_format, info):
+    """Formats the filename based on a custom user-defined format."""
     replacements = {
         '{title}': info.get('title', 'N/A'),
         '{artist}': info.get('artist') or info.get('uploader', 'N/A'),
         '{album}': info.get('album', 'N/A'),
     }
+
     formatted_name = custom_format
     if not formatted_name.strip():
+        logging.warning("Custom format string was empty, falling back to default.")
         return sanitize_filename(info.get('title', 'untitled_audio'))
+
     for placeholder, value in replacements.items():
         if value:
             formatted_name = formatted_name.replace(placeholder, str(value))
+
     return sanitize_filename(formatted_name)
 
 @app.route('/download', methods=['POST'])
 def download():
+    """Handles the download request, restricted to SoundCloud URLs."""
     data = request.get_json()
-    if not data or not data.get('url') or 'soundcloud.com' not in data.get('url'):
+    if not data:
         return jsonify({"success": False, "error": "Invalid request."}), 400
 
     url = data.get('url')
     quality = data.get('quality', '192')
     custom_format = data.get('custom_format')
 
+    logging.info(f"Received download request. URL: {url}, Quality: {quality}")
+    if custom_format:
+        logging.info(f"Custom format template: '{custom_format}'")
+
+    if not url:
+        return jsonify({"success": False, "error": "URL is required."}), 400
+
+    if 'soundcloud.com' not in url:
+        logging.warning(f"Rejected non-SoundCloud URL: {url}")
+        return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
+
+    common_ydl_opts = {
+        'nopart': True,
+        'http_headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'},
+        'geo_bypass': True,
+        'quiet': True,
+        'no_warnings': True,
+    }
+
     try:
-        with yt_dlp.YoutubeDL({'nopart': True}) as ydl:
+        logging.info("Extracting media info...")
+        with yt_dlp.YoutubeDL(common_ydl_opts) as ydl:
+
             info = ydl.extract_info(url, download=False)
+
+        logging.info(f"Successfully extracted info for '{info.get('title')}'")
 
         if custom_format:
             safe_title = get_formatted_filename(custom_format, info)
@@ -54,50 +101,72 @@ def download():
         if not safe_title:
              safe_title = sanitize_filename(info.get('id', 'untitled_audio'))
 
-        output_template = os.path.join(DOWNLOADS_FOLDER, safe_title)
+        logging.info(f"Sanitized filename will be: '{safe_title}'")
 
-        if sys.platform == "win32":
-            ffmpeg_exe_path = r'C:\ProgramData\chocolatey\bin\ffmpeg.exe'
-        else:
-
-            ffmpeg_exe_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'ffmpeg'))
+        output_template = os.path.join(DOWNLOADS_FOLDER, f'{safe_title}.%(ext)s')
 
         ydl_opts = {
+            **common_ydl_opts,
             'outtmpl': output_template,
-            'ffmpeg_location': ffmpeg_exe_path,
             'format': 'bestaudio/best',
-            'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': quality}],
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': quality,
+            }],
         }
 
+        logging.info("Starting download and conversion with yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([info['webpage_url']])
+        logging.info("Download and conversion finished.")
 
         final_filename_mp3 = f'{safe_title}.mp3'
         final_filepath = os.path.join(DOWNLOADS_FOLDER, final_filename_mp3)
 
         if not os.path.exists(final_filepath):
+            logging.error(f"File not found after download: {final_filepath}")
             raise FileNotFoundError("Could not find the converted MP3 file after processing.")
 
-        with open(final_filepath, 'rb') as f:
-            binary_data = f.read()
+        download_url = f"/static/downloads/{quote(final_filename_mp3)}"
 
-        os.remove(final_filepath)
+        duration_seconds = info.get("duration")
+        duration_str = "N/A"
+        if duration_seconds:
+            m, s = divmod(duration_seconds, 60)
+            h, m = divmod(m, 60)
+            duration_str = f"{int(h):02d}:{int(m):02d}:{int(s):02d}" if h > 0 else f"{int(m):02d}:{int(s):02d}"
 
-        base64_data = base64.b64encode(binary_data).decode('utf-8')
-        download_url = f"data:audio/mpeg;base64,{base64_data}"
-
-        return jsonify({
+        response_data = {
             "success": True,
             "download_url": download_url,
             "filename": final_filename_mp3,
             "title": info.get("title", "Untitled"),
             "thumbnail": info.get("thumbnail"),
             "uploader": info.get("uploader", "N/A"),
-            "duration": info.get("duration",0)
-        })
+            "duration": duration_str
+        }
+        logging.info("Successfully prepared response.")
+        return jsonify(response_data)
 
+    except yt_dlp.utils.DownloadError as e:
+        error_message = str(e)
+        logging.error(f"yt-dlp DownloadError: {error_message}", exc_info=True)
+        if "is not a valid URL" in error_message:
+            return jsonify({"success": False, "error": "The provided link is not a valid URL."}), 400
+        if "Unsupported URL" in error_message:
+            return jsonify({"success": False, "error": "This website or URL is not supported."}), 400
+        return jsonify({"success": False, "error": f"Failed to download from the URL: {error_message}"}), 500
     except Exception as e:
-        logging.error(f"A critical error occurred: {e}", exc_info=True)
+        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serves static files."""
+    return send_from_directory(STATIC_FOLDER, filename)
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
 
 application = app
