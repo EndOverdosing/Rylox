@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, send_from_directory, render_template_string
+from flask import Flask, request, jsonify, send_from_directory, render_template_string, Response
 import os
 import yt_dlp
 import logging
 import re
-from urllib.parse import quote
+from urllib.parse import quote, unquote
+import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -31,6 +32,27 @@ def favicon():
     """Serves the favicon."""
     return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
                                'icon.png', mimetype='image/png')
+
+@app.route('/thumbnail')
+def thumbnail_proxy():
+    """Fetches and serves a thumbnail image to bypass hotlinking protection."""
+    image_url = request.args.get('url')
+    if not image_url:
+        return "Missing image URL", 400
+
+    try:
+        s = requests.Session()
+        s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+        
+        resp = s.get(unquote(image_url), stream=True, timeout=10)
+        resp.raise_for_status()
+
+        return Response(resp.iter_content(chunk_size=1024), content_type=resp.headers['Content-Type'])
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Failed to proxy thumbnail {image_url}: {e}")
+        return "Failed to fetch image", 502
+
 
 def sanitize_filename(filename):
     """Removes illegal characters from a filename."""
@@ -73,7 +95,7 @@ def download():
     if not url:
         return jsonify({"success": False, "error": "URL is required."}), 400
 
-    if 'soundcloud.com' not in url:
+    if not re.search(r'https?://(www\.)?soundcloud\.com/', url):
         logging.warning(f"Rejected non-SoundCloud URL: {url}")
         return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
 
@@ -88,7 +110,6 @@ def download():
     try:
         logging.info("Extracting media info...")
         with yt_dlp.YoutubeDL(common_ydl_opts) as ydl:
-
             info = ydl.extract_info(url, download=False)
 
         logging.info(f"Successfully extracted info for '{info.get('title')}'")
@@ -129,6 +150,11 @@ def download():
             raise FileNotFoundError("Could not find the converted MP3 file after processing.")
 
         download_url = f"/static/downloads/{quote(final_filename_mp3)}"
+        
+        thumbnail_url = ""
+        original_thumbnail = info.get("thumbnail")
+        if original_thumbnail:
+            thumbnail_url = f"/thumbnail?url={quote(original_thumbnail)}"
 
         duration_seconds = info.get("duration")
         duration_str = "N/A"
@@ -142,7 +168,7 @@ def download():
             "download_url": download_url,
             "filename": final_filename_mp3,
             "title": info.get("title", "Untitled"),
-            "thumbnail": info.get("thumbnail"),
+            "thumbnail": thumbnail_url,
             "uploader": info.get("uploader", "N/A"),
             "duration": duration_str
         }
