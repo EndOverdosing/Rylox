@@ -20,7 +20,6 @@ for subfolder in ['js', 'styling', 'images', 'downloads']:
 
 @app.route('/')
 def home():
-    """Serves the main HTML page."""
     try:
         with open('index.html', encoding='utf-8') as f:
             return render_template_string(f.read())
@@ -29,13 +28,11 @@ def home():
 
 @app.route('/favicon.ico')
 def favicon():
-    """Serves the favicon."""
     return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
                                'icon.png', mimetype='image/png')
 
 @app.route('/thumbnail')
 def thumbnail_proxy():
-    """Fetches and serves a thumbnail image to bypass hotlinking protection."""
     image_url = request.args.get('url')
     if not image_url:
         return "Missing image URL", 400
@@ -43,23 +40,17 @@ def thumbnail_proxy():
     try:
         s = requests.Session()
         s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
-        
         resp = s.get(unquote(image_url), stream=True, timeout=10)
         resp.raise_for_status()
-
         return Response(resp.iter_content(chunk_size=1024), content_type=resp.headers['Content-Type'])
-
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to proxy thumbnail {image_url}: {e}")
         return "Failed to fetch image", 502
 
-
 def sanitize_filename(filename):
-    """Removes illegal characters from a filename."""
     return re.sub(r'[\\/*?:"<>|]', "", filename).strip()
 
 def get_formatted_filename(custom_format, info):
-    """Formats the filename based on a custom user-defined format."""
     replacements = {
         '{title}': info.get('title', 'N/A'),
         '{artist}': info.get('artist') or info.get('uploader', 'N/A'),
@@ -79,7 +70,6 @@ def get_formatted_filename(custom_format, info):
 
 @app.route('/download', methods=['POST'])
 def download():
-    """Handles the download request, restricted to SoundCloud URLs."""
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Invalid request."}), 400
@@ -99,9 +89,21 @@ def download():
         logging.warning(f"Rejected non-SoundCloud URL: {url}")
         return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
 
+    client_id = os.environ.get('SOUNDCLOUD_CLIENT_ID')
+    
+    http_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
+    if client_id:
+        logging.info("Using SoundCloud Client ID for authentication.")
+        http_headers['Authorization'] = f'OAuth {client_id}'
+    else:
+        logging.warning("SOUNDCLOUD_CLIENT_ID not set. Extraction may be less reliable.")
+
     common_ydl_opts = {
         'nopart': True,
-        'http_headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'},
+        'http_headers': http_headers,
         'geo_bypass': True,
         'quiet': True,
         'no_warnings': True,
@@ -189,7 +191,6 @@ def download():
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """Serves static files."""
     return send_from_directory(STATIC_FOLDER, filename)
 
 if __name__ == '__main__':
