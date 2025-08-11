@@ -38,9 +38,12 @@ def thumbnail_proxy():
         return "Missing image URL", 400
 
     try:
-        s = requests.Session()
-        s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
-        resp = s.get(unquote(image_url), stream=True, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            'Referer': 'https://soundcloud.com/'
+        }
+        resp = requests.get(unquote(image_url), headers=headers, stream=True, timeout=10)
         resp.raise_for_status()
         return Response(resp.iter_content(chunk_size=1024), content_type=resp.headers['Content-Type'])
     except requests.exceptions.RequestException as e:
