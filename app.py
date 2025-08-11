@@ -42,7 +42,6 @@ def thumbnail_proxy():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Referer': 'https://soundcloud.com/'
         }
-        
         resp = requests.get(unquote(image_url), headers=headers, timeout=15)
         resp.raise_for_status()
         return Response(resp.content, content_type=resp.headers['Content-Type'])
@@ -59,15 +58,12 @@ def get_formatted_filename(custom_format, info):
         '{artist}': info.get('artist') or info.get('uploader', 'N/A'),
         '{album}': info.get('album', 'N/A'),
     }
-
     formatted_name = custom_format
     if not formatted_name.strip():
         return sanitize_filename(info.get('title', 'untitled_audio'))
-
     for placeholder, value in replacements.items():
         if value:
             formatted_name = formatted_name.replace(placeholder, str(value))
-
     return sanitize_filename(formatted_name)
 
 @app.route('/download', methods=['POST'])
@@ -87,7 +83,6 @@ def download():
         parsed_url = urlparse(raw_url)
         netloc = parsed_url.netloc.replace('m.soundcloud.com', 'soundcloud.com')
         clean_url = urlunparse((parsed_url.scheme, netloc, parsed_url.path, '', '', ''))
-        logging.info(f"Cleaned URL from '{raw_url}' to '{clean_url}'")
         url = clean_url
     except Exception:
         url = raw_url
@@ -95,17 +90,28 @@ def download():
     if 'soundcloud.com' not in url:
         return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
 
-    common_ydl_opts = {
-        'nopart': True,
-        'http_headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'},
-        'geo_bypass': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
-
     try:
+        logging.info(f"Attempting to get session cookies from SoundCloud...")
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        session.get('https://soundcloud.com/')
+        logging.info(f"Session cookies obtained.")
+
+        common_ydl_opts = {
+            'nopart': True,
+            'quiet': True,
+            'no_warnings': True,
+            'cookiefile': None,
+            'cookies': session.cookies,
+        }
+
+        logging.info(f"Extracting media info for URL: {url}")
         with yt_dlp.YoutubeDL(common_ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+
+        logging.info(f"Successfully extracted info for '{info.get('title')}'")
 
         if custom_format:
             safe_title = get_formatted_filename(custom_format, info)
@@ -124,8 +130,10 @@ def download():
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': quality}],
         }
 
+        logging.info("Starting download and conversion with yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([info['webpage_url']])
+        logging.info("Download and conversion finished.")
 
         final_filename_mp3 = f'{safe_title}.mp3'
         final_filepath = os.path.join(DOWNLOADS_FOLDER, final_filename_mp3)
@@ -157,16 +165,19 @@ def download():
             "uploader": info.get("uploader", "N/A"),
             "duration": duration_str
         }
+        logging.info("Successfully prepared response.")
         return jsonify(response_data)
 
     except yt_dlp.utils.DownloadError as e:
         error_message = str(e)
+        logging.error(f"yt-dlp DownloadError: {error_message}", exc_info=True)
         if "is not a valid URL" in error_message:
             return jsonify({"success": False, "error": "The provided link is not a valid URL."}), 400
         if "Unsupported URL" in error_message:
             return jsonify({"success": False, "error": "This website or URL is not supported."}), 400
         return jsonify({"success": False, "error": f"Failed to download from the URL: {error_message}"}), 500
     except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/static/<path:filename>')
