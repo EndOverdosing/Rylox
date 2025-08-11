@@ -3,8 +3,8 @@ import os
 import yt_dlp
 import logging
 import re
-from urllib.parse import quote, unquote
-import requests 
+from urllib.parse import quote, unquote, urlparse, urlunparse
+import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -20,7 +20,6 @@ for subfolder in ['js', 'styling', 'images', 'downloads']:
 
 @app.route('/')
 def home():
-    """Serves the main HTML page."""
     try:
         with open('index.html', encoding='utf-8') as f:
             return render_template_string(f.read())
@@ -29,38 +28,29 @@ def home():
 
 @app.route('/favicon.ico')
 def favicon():
-    """Serves the favicon."""
     return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
                                'icon.png', mimetype='image/png')
 
 @app.route('/thumbnail')
 def thumbnail_proxy():
-    """Fetches and serves a thumbnail image to bypass hotlinking protection."""
     image_url = request.args.get('url')
     if not image_url:
         return "Missing image URL", 400
 
     try:
-
         s = requests.Session()
         s.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
-
         resp = s.get(unquote(image_url), stream=True, timeout=10)
-        resp.raise_for_status() 
-
+        resp.raise_for_status()
         return Response(resp.iter_content(chunk_size=1024), content_type=resp.headers['Content-Type'])
-
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to proxy thumbnail {image_url}: {e}")
-
         return "Failed to fetch image", 502
 
 def sanitize_filename(filename):
-    """Removes illegal characters from a filename."""
     return re.sub(r'[\\/*?:"<>|]', "", filename).strip()
 
 def get_formatted_filename(custom_format, info):
-    """Formats the filename based on a custom user-defined format."""
     replacements = {
         '{title}': info.get('title', 'N/A'),
         '{artist}': info.get('artist') or info.get('uploader', 'N/A'),
@@ -69,7 +59,6 @@ def get_formatted_filename(custom_format, info):
 
     formatted_name = custom_format
     if not formatted_name.strip():
-        logging.warning("Custom format string was empty, falling back to default.")
         return sanitize_filename(info.get('title', 'untitled_audio'))
 
     for placeholder, value in replacements.items():
@@ -80,23 +69,37 @@ def get_formatted_filename(custom_format, info):
 
 @app.route('/download', methods=['POST'])
 def download():
-    """Handles the download request, restricted to SoundCloud URLs."""
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Invalid request."}), 400
 
-    url = data.get('url')
+    raw_url = data.get('url')
     quality = data.get('quality', '192')
     custom_format = data.get('custom_format')
 
-    logging.info(f"Received download request. URL: {url}, Quality: {quality}")
+    if not raw_url:
+        return jsonify({"success": False, "error": "URL is required."}), 400
+        
+    try:
+        parsed_url = urlparse(raw_url)
+        netloc = parsed_url.netloc.replace('m.soundcloud.com', 'soundcloud.com')
+        clean_url = urlunparse((
+            parsed_url.scheme,
+            netloc,
+            parsed_url.path,
+            '', '', ''
+        ))
+        logging.info(f"Cleaned URL from '{raw_url}' to '{clean_url}'")
+        url = clean_url
+    except Exception as e:
+        logging.error(f"Failed to parse URL: {raw_url}. Error: {e}")
+        url = raw_url
+
+    logging.info(f"Processing download for URL: {url}, Quality: {quality}")
     if custom_format:
         logging.info(f"Custom format template: '{custom_format}'")
 
-    if not url:
-        return jsonify({"success": False, "error": "URL is required."}), 400
-
-    if not re.search(r'https?://(www\.)?soundcloud\.com/', url):
+    if 'soundcloud.com' not in url:
         logging.warning(f"Rejected non-SoundCloud URL: {url}")
         return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
 
@@ -151,7 +154,7 @@ def download():
             raise FileNotFoundError("Could not find the converted MP3 file after processing.")
 
         download_url = f"/static/downloads/{quote(final_filename_mp3)}"
-
+        
         thumbnail_url = ""
         original_thumbnail = info.get("thumbnail")
         if original_thumbnail:
@@ -169,7 +172,7 @@ def download():
             "download_url": download_url,
             "filename": final_filename_mp3,
             "title": info.get("title", "Untitled"),
-            "thumbnail": thumbnail_url, 
+            "thumbnail": thumbnail_url,
             "uploader": info.get("uploader", "N/A"),
             "duration": duration_str
         }
@@ -190,7 +193,6 @@ def download():
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """Serves static files."""
     return send_from_directory(STATIC_FOLDER, filename)
 
 if __name__ == '__main__':
