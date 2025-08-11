@@ -40,12 +40,12 @@ def thumbnail_proxy():
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
             'Referer': 'https://soundcloud.com/'
         }
-        resp = requests.get(unquote(image_url), headers=headers, stream=True, timeout=10)
+        
+        resp = requests.get(unquote(image_url), headers=headers, timeout=15)
         resp.raise_for_status()
-        return Response(resp.iter_content(chunk_size=1024), content_type=resp.headers['Content-Type'])
+        return Response(resp.content, content_type=resp.headers['Content-Type'])
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to proxy thumbnail {image_url}: {e}")
         return "Failed to fetch image", 502
@@ -86,24 +86,13 @@ def download():
     try:
         parsed_url = urlparse(raw_url)
         netloc = parsed_url.netloc.replace('m.soundcloud.com', 'soundcloud.com')
-        clean_url = urlunparse((
-            parsed_url.scheme,
-            netloc,
-            parsed_url.path,
-            '', '', ''
-        ))
+        clean_url = urlunparse((parsed_url.scheme, netloc, parsed_url.path, '', '', ''))
         logging.info(f"Cleaned URL from '{raw_url}' to '{clean_url}'")
         url = clean_url
-    except Exception as e:
-        logging.error(f"Failed to parse URL: {raw_url}. Error: {e}")
+    except Exception:
         url = raw_url
 
-    logging.info(f"Processing download for URL: {url}, Quality: {quality}")
-    if custom_format:
-        logging.info(f"Custom format template: '{custom_format}'")
-
     if 'soundcloud.com' not in url:
-        logging.warning(f"Rejected non-SoundCloud URL: {url}")
         return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
 
     common_ydl_opts = {
@@ -115,11 +104,8 @@ def download():
     }
 
     try:
-        logging.info("Extracting media info...")
         with yt_dlp.YoutubeDL(common_ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-
-        logging.info(f"Successfully extracted info for '{info.get('title')}'")
 
         if custom_format:
             safe_title = get_formatted_filename(custom_format, info)
@@ -129,31 +115,22 @@ def download():
         if not safe_title:
              safe_title = sanitize_filename(info.get('id', 'untitled_audio'))
 
-        logging.info(f"Sanitized filename will be: '{safe_title}'")
-
         output_template = os.path.join(DOWNLOADS_FOLDER, f'{safe_title}.%(ext)s')
 
         ydl_opts = {
             **common_ydl_opts,
             'outtmpl': output_template,
             'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': quality,
-            }],
+            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': quality}],
         }
 
-        logging.info("Starting download and conversion with yt-dlp...")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([info['webpage_url']])
-        logging.info("Download and conversion finished.")
 
         final_filename_mp3 = f'{safe_title}.mp3'
         final_filepath = os.path.join(DOWNLOADS_FOLDER, final_filename_mp3)
 
         if not os.path.exists(final_filepath):
-            logging.error(f"File not found after download: {final_filepath}")
             raise FileNotFoundError("Could not find the converted MP3 file after processing.")
 
         download_url = f"/static/downloads/{quote(final_filename_mp3)}"
@@ -161,7 +138,8 @@ def download():
         thumbnail_url = ""
         original_thumbnail = info.get("thumbnail")
         if original_thumbnail:
-            thumbnail_url = f"/thumbnail?url={quote(original_thumbnail)}"
+            web_friendly_thumbnail = original_thumbnail.replace('-original.jpg', '-t500x500.jpg')
+            thumbnail_url = f"/thumbnail?url={quote(web_friendly_thumbnail)}"
 
         duration_seconds = info.get("duration")
         duration_str = "N/A"
@@ -179,19 +157,16 @@ def download():
             "uploader": info.get("uploader", "N/A"),
             "duration": duration_str
         }
-        logging.info("Successfully prepared response.")
         return jsonify(response_data)
 
     except yt_dlp.utils.DownloadError as e:
         error_message = str(e)
-        logging.error(f"yt-dlp DownloadError: {error_message}", exc_info=True)
         if "is not a valid URL" in error_message:
             return jsonify({"success": False, "error": "The provided link is not a valid URL."}), 400
         if "Unsupported URL" in error_message:
             return jsonify({"success": False, "error": "This website or URL is not supported."}), 400
         return jsonify({"success": False, "error": f"Failed to download from the URL: {error_message}"}), 500
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/static/<path:filename>')
