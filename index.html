@@ -23,86 +23,430 @@
 </head>
 
 <body>
-    <div class="theme-switcher" id="theme-switcher" title="Toggle Theme">
-        <div class="sun-icon"><i class="fa-solid fa-sun"></i></div>
-        <div class="moon-icon"><i class="fa-solid fa-moon"></i></div>
-    </div>
-
-    <div class="blurry-orbs">
-        <div></div>
-        <div></div>
-        <div></div>
-    </div>
-
-    <div class="main-content-wrapper">
-        <header class="hero-header">
-            <img src="/static/images/transparent-icon-light.png" alt="Rylox Logo Dark" class="logo logo-dark"
-                width="100" height="100">
-            <img src="/static/images/transparent-icon-black.png" alt="Rylox Logo Light" class="logo logo-light"
-                width="100" height="100">
-            <p class="subtitle">Download Your Favorite Soundcloud Tracks.</p>
-        </header>
-
-        <form class="url-form-container" onsubmit="downloadMedia(event)">
-            <div class="url-form interactive-border">
-                <i class="fa-solid fa-link form-icon"></i>
-                <input type="text" id="url-input" placeholder="Enter your SoundCloud music URL..."
-                    required>
-                <div class="quality-select-wrapper">
-                    <select id="quality-select">
-                        <option value="128">128kbps</option>
-                        <option value="192">192kbps</option>
-                        <option value="256">256kbps</option>
-                        <option value="320">320kbps</option>
-                    </select>
-                </div>
-                <button id="submit-button" type="submit">
-                    <i class="fa-solid fa-angle-right"></i>
+    <div class="background-orb-container" id="orb-container"></div>
+    <div class="navbar-wrapper">
+        <nav class="navbar" id="mainNavbar">
+            <div class="nav-group nav-left">
+                <a class="navbar-brand-button" id="navbarBrandAndBack" aria-label="Home">
+                    <span class="navbar-logo">
+                        <img src="/static/images/icon.png" alt="Rylox Logo">
+                    </span>
+                    <span class="brand-text">Rylox</span>
+                </a>
+            </div>
+            <div class="nav-search-container" id="navSearchContainer">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="navSearchInput" placeholder="Search for music..." autocomplete="off">
+            </div>
+            <div class="nav-group nav-right">
+                <button class="nav-icon-button settings-button" id="settings-trigger" aria-label="Settings">
+                    <i class="fas fa-cog"></i>
+                    <span class="nav-action-text">Settings</span>
+                </button>
+                <button class="hamburger-menu" id="hamburgerBtn" aria-label="Toggle navigation" aria-expanded="false"
+                    aria-controls="dropdownMenu">
+                    <i class="fas fa-bars hamburger-icon-fallback"></i>
+                    <i class="fas fa-chevron-down arrow-icon" aria-hidden="true"></i>
                 </button>
             </div>
-
-            <button type="button" id="paste-button-mobile" class="paste-button-mobile">
-                <i class="fa-solid fa-paste"></i> Paste Link from Clipboard
-            </button>
-
-
-            <div id="formatting-settings" class="interactive-border">
-                <div class="settings-header">
-                    <i class="fa-solid fa-chevron-right"></i>
-                    <span>Custom Filename</span>
-                </div>
-                <div id="custom-format-list" class="format-options hidden">
-                    <p class="format-hint">Define your filename. You don't have to use the {} tags. Leave blank to use
-                        the original title.</p>
-                    <div class="metadata-input-group">
-                        <label for="format-artist">Artist</label>
-                        <input type="text" id="format-artist" placeholder="{artist}">
-                    </div>
-                    <div class="metadata-input-group">
-                        <label for="format-title">Title</label>
-                        <input type="text" id="format-title" placeholder="{title}">
-                    </div>
-                    <div class="metadata-input-group">
-                        <label for="format-album">Album</label>
-                        <input type="text" id="format-album" placeholder="{album}">
-                    </div>
-                </div>
+            <div class="dropdown-menu" id="dropdownMenu" role="menu">
+                <a href="/" role="menuitem" data-page="home"><i class="fas fa-home"></i><span
+                        class="nav-link-text">Home</span></a>
+                <button id="help-btn" role="menuitem"><i class="fas fa-circle-question"></i><span
+                        class="nav-link-text">Help</span></button>
+                <button id="settings-btn" role="menuitem"><i class="fas fa-cog"></i><span
+                        class="nav-link-text">Settings</span></button>
+                <button id="logout-btn" role="menuitem" class="hidden"><i class="fas fa-sign-out-alt"></i><span
+                        class="nav-link-text">Logout</span></button>
             </div>
-        </form>
-
-        <div id="progress-container" class="hidden">
-            <div class="progress-card interactive-border">
-                <h3>Working on it...</h3>
-                <p id="progress-status">Initializing...</p>
-                <div class="progress-bar-container">
-                    <div id="progress-bar"></div>
+        </nav>
+    </div>
+    <div id="minimal-hero-container" class="hidden">
+        <div id="hero-particles"></div>
+        <div class="minimal-hero-content active" id="minimal-hero-content">
+            <h1 id="greeting-text"></h1>
+        </div>
+        <div class="minimal-hero-content skeleton-layer" id="minimal-hero-skeleton">
+            <div class="skeleton-title-line"></div>
+            <div class="skeleton-title-line short"></div>
+        </div>
+    </div>
+    <div id="settings-overlay">
+        <div class="details-overlay-backdrop"></div>
+        <div class="details-overlay-pane">
+            <div class="drag-handle"></div>
+            <button class="details-overlay-close" id="settings-close">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="details-overlay-scroll-container">
+                <div class="settings-content">
+                    <div class="settings-header">
+                        <h2>Settings</h2>
+                        <p>Customize your experience</p>
+                    </div>
+                    <div class="settings-skeleton hidden">
+                        <div class="skeleton-title-line" style="width: 60%; height: 30px; margin: 20px auto;"></div>
+                        <div class="skeleton-title-line" style="width: 80%; height: 40px; margin: 15px auto;"></div>
+                        <div class="skeleton-title-line" style="width: 70%; height: 35px; margin: 15px auto;"></div>
+                    </div>
+                    <div class="settings-nav">
+                        <button class="settings-nav-btn active" data-tab="general">General</button>
+                        <button class="settings-nav-btn" data-tab="appearance">Appearance</button>
+                        <button class="settings-nav-btn" data-tab="download">Download</button>
+                        <button class="settings-nav-btn" data-tab="advanced">Advanced</button>
+                    </div>
+                    <div class="settings-tab active" id="general-tab">
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <div class="setting-info"><span>Minimal Header</span>
+                                    <p>Show the particle greeting header</p>
+                                </div>
+                                <label class="toggle-switch"><input type="checkbox" id="minimal-mode"><span
+                                        class="slider"></span></label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Auto-download</span>
+                                    <p>Automatically start download after adding URL</p>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="auto-download">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-tab" id="appearance-tab">
+                        <div class="settings-group">
+                            <div class="setting-item column-layout">
+                                <div class="setting-info">
+                                    <span>Theme</span>
+                                    <p>Choose your preferred color scheme</p>
+                                </div>
+                                <div class="theme-grid-advanced">
+                                    <button class="theme-option active" data-theme="default">
+                                        <div class="theme-preview-card default-preview">
+                                            <div class="preview-nav-dot"></div>
+                                            <div class="preview-hero"></div>
+                                            <div class="preview-row"></div>
+                                            <div class="preview-row short"></div>
+                                            <div class="active-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                        <span>Default</span>
+                                    </button>
+                                    <button class="theme-option" data-theme="midnight">
+                                        <div class="theme-preview-card midnight-preview">
+                                            <div class="preview-nav-dot"></div>
+                                            <div class="preview-hero"></div>
+                                            <div class="preview-row"></div>
+                                            <div class="preview-row short"></div>
+                                            <div class="active-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                        <span>Midnight</span>
+                                    </button>
+                                    <button class="theme-option" data-theme="ocean">
+                                        <div class="theme-preview-card ocean-preview">
+                                            <div class="preview-nav-dot"></div>
+                                            <div class="preview-hero"></div>
+                                            <div class="preview-row"></div>
+                                            <div class="preview-row short"></div>
+                                            <div class="active-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                        <span>Ocean</span>
+                                    </button>
+                                    <button class="theme-option" data-theme="teal">
+                                        <div class="theme-preview-card teal-preview">
+                                            <div class="preview-nav-dot"></div>
+                                            <div class="preview-hero"></div>
+                                            <div class="preview-row"></div>
+                                            <div class="preview-row short"></div>
+                                            <div class="active-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                        <span>Teal</span>
+                                    </button>
+                                    <button class="theme-option" data-theme="crimson">
+                                        <div class="theme-preview-card crimson-preview">
+                                            <div class="preview-nav-dot"></div>
+                                            <div class="preview-hero"></div>
+                                            <div class="preview-row"></div>
+                                            <div class="preview-row short"></div>
+                                            <div class="active-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                        <span>Crimson</span>
+                                    </button>
+                                    <button class="theme-option" data-theme="forest">
+                                        <div class="theme-preview-card forest-preview">
+                                            <div class="preview-nav-dot"></div>
+                                            <div class="preview-hero"></div>
+                                            <div class="preview-row"></div>
+                                            <div class="preview-row short"></div>
+                                            <div class="active-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                        <span>Forest</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Glass Blur</span>
+                                    <p>Adjust interface transparency blur</p>
+                                </div>
+                                <div class="setting-range-wrapper">
+                                    <input type="range" id="setting-blur-intensity" min="0" max="2" step="0.1"
+                                        value="1">
+                                    <span class="setting-range-value" id="setting-blur-val">1.0</span>
+                                    <button class="slider-reset-btn" data-target="setting-blur-intensity"
+                                        data-default="1" aria-label="Reset to default">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Font Size</span>
+                                    <p>Scale text size up or down</p>
+                                </div>
+                                <div class="setting-range-wrapper">
+                                    <input type="range" id="setting-font-size" min="12" max="22" step="0.5"
+                                        value="14.5">
+                                    <span class="setting-range-value" id="setting-font-size-val">14.5</span>
+                                    <button class="slider-reset-btn" data-target="setting-font-size" data-default="14.5"
+                                        aria-label="Reset to default">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-tab" id="download-tab">
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Default Quality</span>
+                                    <p>Set the default audio quality for downloads</p>
+                                </div>
+                                <div class="custom-select-wrapper full-width">
+                                    <select id="default-quality">
+                                        <option value="128">128 kbps</option>
+                                        <option value="192" selected>192 kbps</option>
+                                        <option value="256">256 kbps</option>
+                                        <option value="320">320 kbps</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Custom Filename</span>
+                                    <p>Use custom filename patterns</p>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="filename-toggle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="filename-content hidden">
+                                <div class="filename-presets">
+                                    <button type="button" class="preset-btn" data-preset="artist-title">Artist -
+                                        Title</button>
+                                    <button type="button" class="preset-btn" data-preset="title-artist">Title -
+                                        Artist</button>
+                                    <button type="button" class="preset-btn" data-preset="artist-title-album">Artist -
+                                        Title
+                                        (Album)</button>
+                                    <button type="button" class="preset-btn" data-preset="title-only">Title
+                                        Only</button>
+                                </div>
+                                <div class="filename-custom">
+                                    <input type="text" id="filename-pattern" placeholder="Custom pattern">
+                                    <div class="filename-tags">
+                                        <span class="tag" data-tag="{artist}">Artist</span>
+                                        <span class="tag" data-tag="{title}">Title</span>
+                                        <span class="tag" data-tag="{album}">Album</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-tab" id="advanced-tab">
+                        <div class="settings-group">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Reduced Motion</span>
+                                    <p>Disable heavy animations</p>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-reduced-motion">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span>Dyslexia Friendly</span>
+                                    <p>Use OpenDyslexic font family</p>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-opendyslexic">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-footer">
+                        <button id="settings-apply-btn" class="cta-button">
+                            <i class="fas fa-check"></i> Apply Settings
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div id="output-area"></div>
     </div>
-
+    <div id="help-overlay">
+        <div class="details-overlay-backdrop"></div>
+        <div class="details-overlay-pane">
+            <div class="drag-handle"></div>
+            <button class="details-overlay-close" aria-label="Close Help">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="details-overlay-scroll-container">
+                <div class="help-header">
+                    <h2>Help Center</h2>
+                    <p>Get help with using Rylox</p>
+                    <div class="help-search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="help-search-input" placeholder="Search for help..." autocomplete="off">
+                    </div>
+                </div>
+                <div id="help-articles-container">
+                    <section class="help-article">
+                        <h3>Getting Started</h3>
+                        <h4>Welcome to Rylox</h4>
+                        <p>Rylox is a simple and fast music downloader for SoundCloud and other platforms. Just paste a
+                            URL and download your favorite tracks.</p>
+                        <h4>How to Download</h4>
+                        <ol>
+                            <li>Copy the SoundCloud URL of the track you want</li>
+                            <li>Paste it into the search box on the home page</li>
+                            <li>Select your preferred quality</li>
+                            <li>Click download and wait for the conversion</li>
+                        </ol>
+                    </section>
+                    <section class="help-article">
+                        <h3>Features</h3>
+                        <h4>Custom Filenames</h4>
+                        <p>You can customize how your downloaded files are named. Use patterns like "Artist - Title" or
+                            create your own.</p>
+                        <h4>Quality Options</h4>
+                        <p>Choose from 128, 192, 256, or 320 kbps quality for your downloads.</p>
+                    </section>
+                </div>
+                <div id="no-results-message" class="hidden">
+                    <i class="fas fa-search"></i>
+                    <h3>No results found</h3>
+                    <p>We couldn't find any help articles matching your search.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <main class="main-content">
+        <div class="main-content-wrapper">
+            <header class="hero-header">
+                <img src="/static/images/transparent-icon-light.png" alt="Rylox Logo Dark" class="logo logo-dark"
+                    width="100" height="100">
+                <p class="subtitle">Download Your Favorite Soundcloud Tracks.</p>
+            </header>
+            <div class="url-form-container" id="url-form-container">
+                <div class="url-form interactive-border">
+                    <i class="fa-solid fa-link form-icon"></i>
+                    <input type="text" id="url-input" placeholder="Enter your SoundCloud music URL..." required>
+                    <div class="quality-select-wrapper">
+                        <select id="quality-select">
+                            <option value="128">128kbps</option>
+                            <option value="192">192kbps</option>
+                            <option value="256">256kbps</option>
+                            <option value="320">320kbps</option>
+                        </select>
+                    </div>
+                    <button id="submit-button" type="button">
+                        <i class="fa-solid fa-angle-right"></i>
+                    </button>
+                </div>
+                <button type="button" id="paste-button-mobile" class="paste-button-mobile">
+                    <i class="fa-solid fa-paste"></i> Paste Link from Clipboard
+                </button>
+                <div class="filename-settings">
+                    <div class="filename-header">
+                        <span>Filename Settings</span>
+                        <label class="toggle-switch small">
+                            <input type="checkbox" id="filename-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="filename-content hidden">
+                        <div class="filename-presets">
+                            <button type="button" class="preset-btn" data-preset="artist-title">Artist - Title</button>
+                            <button type="button" class="preset-btn" data-preset="title-artist">Title - Artist</button>
+                            <button type="button" class="preset-btn" data-preset="artist-title-album">Artist - Title
+                                (Album)</button>
+                            <button type="button" class="preset-btn" data-preset="title-only">Title Only</button>
+                        </div>
+                        <div class="filename-custom">
+                            <input type="text" id="filename-pattern" placeholder="Custom pattern">
+                            <div class="filename-tags">
+                                <span class="tag" data-tag="{artist}">Artist</span>
+                                <span class="tag" data-tag="{title}">Title</span>
+                                <span class="tag" data-tag="{album}">Album</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="progress-container" class="hidden">
+                <div class="progress-card interactive-border">
+                    <h3>Working on it...</h3>
+                    <p id="progress-status">Initializing...</p>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="output-area"></div>
+        </div>
+    </main>
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-left">
+                    <h4>About Us</h4>
+                    <p>Rylox is a streamlined web app that lets you download SoundCloud audio tracks as MP3 files.
+                        Choose your preferred
+                        quality and save tracks directly to your device with ease.</p>
+                </div>
+            </div>
+            <div class="footer-bottom-links">
+                <div class="footer-socials">
+                    <a href="/discord" target="_blank" rel="noopener noreferrer"><i class="fab fa-discord"></i>
+                        Discord</a>
+                </div>
+                <div class="footer-legal">
+                    <a href="/terms-of-service">Terms of Service</a>
+                    <a href="/privacy-policy">Privacy Policy</a>
+                    <a href="/about-us">About</a>
+                </div>
+            </div>
+        </div>
+    </footer>
     <script src="static/js/index.js"></script>
 </body>
 

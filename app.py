@@ -69,116 +69,30 @@ def get_formatted_filename(custom_format, info):
 @app.route('/download', methods=['POST'])
 def download():
     data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "Invalid request."}), 400
-
+    if not data: return jsonify({"success":False,"error":"Invalid request."}),400
     raw_url = data.get('url')
-    quality = data.get('quality', '192')
+    quality = data.get('quality','192')
     custom_format = data.get('custom_format')
-
-    if not raw_url:
-        return jsonify({"success": False, "error": "URL is required."}), 400
-        
+    if not raw_url: return jsonify({"success":False,"error":"URL required."}),400
     try:
-        parsed_url = urlparse(raw_url)
-        netloc = parsed_url.netloc.replace('m.soundcloud.com', 'soundcloud.com')
-        clean_url = urlunparse((parsed_url.scheme, netloc, parsed_url.path, '', '', ''))
-        url = clean_url
-    except Exception:
-        url = raw_url
-
-    if 'soundcloud.com' not in url:
-        return jsonify({"success": False, "error": "Only SoundCloud URLs are supported."}), 400
-
-    try:
-        logging.info(f"Attempting to get session cookies from SoundCloud...")
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        })
-        session.get('https://soundcloud.com/')
-        logging.info(f"Session cookies obtained.")
-
-        common_ydl_opts = {
-            'nopart': True,
-            'quiet': True,
-            'no_warnings': True,
-            'cookiefile': None,
-            'cookies': session.cookies,
-        }
-
-        logging.info(f"Extracting media info for URL: {url}")
-        with yt_dlp.YoutubeDL(common_ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-
-        logging.info(f"Successfully extracted info for '{info.get('title')}'")
-
-        if custom_format:
-            safe_title = get_formatted_filename(custom_format, info)
-        else:
-            safe_title = sanitize_filename(info.get('title', 'untitled_audio'))
-
-        if not safe_title:
-             safe_title = sanitize_filename(info.get('id', 'untitled_audio'))
-
-        output_template = os.path.join(DOWNLOADS_FOLDER, f'{safe_title}.%(ext)s')
-
-        ydl_opts = {
-            **common_ydl_opts,
-            'outtmpl': output_template,
-            'format': 'bestaudio/best',
-            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': quality}],
-        }
-
-        logging.info("Starting download and conversion with yt-dlp...")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([info['webpage_url']])
-        logging.info("Download and conversion finished.")
-
-        final_filename_mp3 = f'{safe_title}.mp3'
-        final_filepath = os.path.join(DOWNLOADS_FOLDER, final_filename_mp3)
-
-        if not os.path.exists(final_filepath):
-            raise FileNotFoundError("Could not find the converted MP3 file after processing.")
-
-        download_url = f"/static/downloads/{quote(final_filename_mp3)}"
-        
-        thumbnail_url = ""
-        original_thumbnail = info.get("thumbnail")
-        if original_thumbnail:
-            web_friendly_thumbnail = original_thumbnail.replace('-original.jpg', '-t500x500.jpg')
-            thumbnail_url = f"/thumbnail?url={quote(web_friendly_thumbnail)}"
-
-        duration_seconds = info.get("duration")
-        duration_str = "N/A"
-        if duration_seconds:
-            m, s = divmod(duration_seconds, 60)
-            h, m = divmod(m, 60)
-            duration_str = f"{int(h):02d}:{int(m):02d}:{int(s):02d}" if h > 0 else f"{int(m):02d}:{int(s):02d}"
-
-        response_data = {
-            "success": True,
-            "download_url": download_url,
-            "filename": final_filename_mp3,
-            "title": info.get("title", "Untitled"),
-            "thumbnail": thumbnail_url,
-            "uploader": info.get("uploader", "N/A"),
-            "duration": duration_str
-        }
-        logging.info("Successfully prepared response.")
-        return jsonify(response_data)
-
-    except yt_dlp.utils.DownloadError as e:
-        error_message = str(e)
-        logging.error(f"yt-dlp DownloadError: {error_message}", exc_info=True)
-        if "is not a valid URL" in error_message:
-            return jsonify({"success": False, "error": "The provided link is not a valid URL."}), 400
-        if "Unsupported URL" in error_message:
-            return jsonify({"success": False, "error": "This website or URL is not supported."}), 400
-        return jsonify({"success": False, "error": f"Failed to download from the URL: {error_message}"}), 500
-    except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
-        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+        parsed=urlparse(raw_url);netloc=parsed.netloc.replace('m.soundcloud.com','soundcloud.com')
+        clean_url=urlunparse((parsed.scheme,netloc,parsed.path,'','',''))
+    except: clean_url=raw_url
+    if 'soundcloud.com' not in clean_url: return jsonify({"success":False,"error":"Only SoundCloud URLs supported."}),400
+    session=requests.Session()
+    session.headers.update({'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+    session.get('https://soundcloud.com/')
+    ydl_opts0={'nopart':True,'quiet':True,'no_warnings':True,'cookies':session.cookies}
+    with yt_dlp.YoutubeDL(ydl_opts0) as ydl: info=ydl.extract_info(clean_url,download=False)
+    safe_title=get_formatted_filename(custom_format,info) if custom_format else sanitize_filename(info.get('title','untitled_audio'))
+    output_template=os.path.join(DOWNLOADS_FOLDER,f'{safe_title}.%(ext)s')
+    thumb=info.get('thumbnail','').replace('-original.jpg','-t500x500.jpg')
+    ydl_opts={**ydl_opts0,'outtmpl':output_template,'format':'bestaudio/best','postprocessors':[{'key':'FFmpegExtractAudio','preferredcodec':'mp3','preferredquality':quality},{'key':'EmbedThumbnail','already_have_thumbnail':False}],'writethumbnail':True,'embed_thumbnail':True,'thumbnail':thumb}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([info['webpage_url']])
+    final_mp3=f'{safe_title}.mp3'
+    if not os.path.exists(os.path.join(DOWNLOADS_FOLDER,final_mp3)): raise FileNotFoundError
+    dur=info.get('duration',0);duration=f"{int(dur//60):02d}:{int(dur%60):02d}" if dur else "N/A"
+    return jsonify({"success":True,"download_url":f"/static/downloads/{quote(final_mp3)}","filename":final_mp3,"title":info.get('title','Untitled'),"thumbnail":f"/thumbnail?url={quote(thumb)}" if thumb else "","uploader":info.get('uploader','N/A'),"duration":duration})
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
