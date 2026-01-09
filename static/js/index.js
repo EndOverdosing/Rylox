@@ -190,6 +190,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 a.click();
                 document.body.removeChild(a);
 
+                const isMobile = window.innerWidth <= 600;
+                if (!isMobile) {
+                    const a = document.createElement('a');
+                    a.href = data.download_url;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+
+
             } catch (e) {
                 showError(e.message);
                 outputArea.innerHTML = '';
@@ -213,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2>${data.title || 'Untitled'}</h2>
                 <p class="result-meta">${data.uploader || 'Unknown'} • ${data.duration || 'N/A'}</p>
                 <div class="download-status">
-                    Download started. If it doesn't begin, <a href="${data.download_url}" download="${data.filename}">click here</a>.
+                    <a href="${data.download_url}" download="${data.filename}">Tap to download</a>
                 </div>
             </div>
         </div>

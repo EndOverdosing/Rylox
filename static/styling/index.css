@@ -379,12 +379,11 @@ body.light-theme .result-background-overlay::after {
 .download-status a {
     color: inherit;
     font-weight: var(--font-weight-semibold);
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration: none !important;
 }
 
 .download-status a:hover {
-    text-decoration: none;
+    text-decoration: none !important;
 }
 
 .result-thumbnail-wrapper {
@@ -421,13 +420,6 @@ body.light-theme .result-background-overlay::after {
     background-color: rgba(16, 163, 127, 0.1);
     color: var(--success-color);
     border: 1px solid rgba(16, 163, 127, 0.2);
-}
-
-.download-status a {
-    color: inherit;
-    font-weight: var(--font-weight-semibold);
-    text-decoration: underline;
-    text-underline-offset: 2px;
 }
 
 .download-status a:hover {
