@@ -26,6 +26,9 @@
     <div class="main-content-wrapper">
 
         <form class="url-form-container" onsubmit="downloadMedia(event)">
+            <button type="button" id="paste-button-mobile" class="paste-button-mobile">
+                <i class="fa-solid fa-paste"></i>
+            </button>
             <div class="url-form">
                 <i class="fa-solid fa-link form-icon"></i>
                 <input type="text" id="url-input" placeholder="Enter SoundCloud URL..." required>
@@ -41,10 +44,6 @@
                     <i class="fa-solid fa-arrow-up"></i>
                 </button>
             </div>
-
-            <button type="button" id="paste-button-mobile" class="paste-button-mobile">
-                <i class="fa-solid fa-paste"></i> Paste Link from Clipboard
-            </button>
         </form>
 
         <div id="output-area"></div>

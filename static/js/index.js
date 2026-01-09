@@ -11,20 +11,28 @@ function showMainSkeleton() {
     const wrapper = document.querySelector('.main-content-wrapper');
     wrapper.classList.add('loading');
 
+    const isMobile = window.innerWidth <= 600;
+    const pasteButtonSkeleton = isMobile
+        ? '<div class="paste-button-mobile" style="display: flex;"><div class="skeleton skeleton-icon" style="margin: 0;"></div></div>'
+        : '';
+
     const skeletonHTML = `
-    <div class="skeleton-wrapper">
-        <div class="skeleton-form">
+<div class="skeleton-wrapper">
+    <div style="display: flex; align-items: center;">
+        ${pasteButtonSkeleton}
+        <div class="skeleton-form" style="flex: 1;">
             <div class="skeleton skeleton-icon"></div>
             <div class="skeleton skeleton-input"></div>
             <div class="skeleton-divider"></div>
             <div class="skeleton skeleton-select"></div>
             <div class="skeleton skeleton-button"></div>
         </div>
-        <div class="skeleton-theme-toggle">
-            <div class="skeleton skeleton-theme-icon"></div>
-            <div class="skeleton skeleton-theme-text"></div>
-        </div>
     </div>
+    <div class="skeleton-theme-toggle">
+        <div class="skeleton skeleton-theme-icon"></div>
+        <div class="skeleton skeleton-theme-text"></div>
+    </div>
+</div>
     `;
 
     wrapper.insertAdjacentHTML('afterbegin', skeletonHTML);
@@ -103,46 +111,40 @@ document.addEventListener('DOMContentLoaded', () => {
         function showSkeletonLoading() {
             const isMobile = window.innerWidth <= 600;
 
+            outputArea.innerHTML = `
+    <div class="result-card loading">
+        <div class="result-background-overlay"></div>
+        <div class="drag-handle"></div>
+        <div class="result-card-inner">
+            <div class="result-thumbnail-wrapper">
+                <div class="skeleton skeleton-thumbnail"></div>
+            </div>
+            <div class="result-info">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text-short" style="margin-top: 0.5rem;"></div>
+                <div class="skeleton skeleton-text-mini" style="margin-top: 0.75rem;"></div>
+            </div>
+        </div>
+    </div>
+    `;
+
+            const card = outputArea.querySelector('.result-card');
+            if (card) card.classList.add('loading');
+
             if (isMobile) {
+                document.documentElement.style.overflow = 'hidden';
                 document.body.style.overflow = 'hidden';
+                document.body.style.position = 'fixed';
+                document.body.style.width = '100%';
+                document.body.style.height = '100%';
 
-                outputArea.innerHTML = `
-                <div class="result-card">
-                    <div class="result-background-overlay"></div>
-                    <div class="drag-handle"></div>
-                    <div class="result-card-inner">
-                        <div class="result-thumbnail-wrapper">
-                            <div class="skeleton skeleton-thumbnail"></div>
-                        </div>
-                        <div class="result-info">
-                            <div class="skeleton skeleton-text"></div>
-                            <div class="skeleton skeleton-text-short" style="margin-top: 0.5rem;"></div>
-                            <div class="skeleton skeleton-text-mini" style="margin-top: 0.75rem;"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
+                const backdrop = document.createElement('div');
+                backdrop.className = 'overlay-backdrop';
+                document.body.appendChild(backdrop);
+                setTimeout(() => backdrop.classList.add('active'), 10);
 
-                setTimeout(() => {
-                    outputArea.classList.add('active');
-                    setupMobileDrag();
-                }, 10);
-            } else {
-                outputArea.innerHTML = `
-                <div class="result-card">
-                    <div class="result-background-overlay"></div>
-                    <div class="result-card-inner">
-                        <div class="result-thumbnail-wrapper">
-                            <div class="skeleton skeleton-thumbnail"></div>
-                        </div>
-                        <div class="result-info">
-                            <div class="skeleton skeleton-text"></div>
-                            <div class="skeleton skeleton-text-short" style="margin-top: 0.5rem;"></div>
-                            <div class="skeleton skeleton-text-mini" style="margin-top: 0.75rem;"></div>
-                        </div>
-                    </div>
-                </div>
-            `;
+                outputArea.classList.add('active');
+                setupMobileDrag();
             }
         }
 
@@ -150,12 +152,17 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault();
 
             const url = urlInput.value.trim();
+
+            const existingError = document.querySelector('.error-box');
+            if (existingError) existingError.remove();
+
             if (!url) {
                 showError('Please enter a music URL.');
                 return;
             }
 
             submitButton.disabled = true;
+
             showSkeletonLoading();
 
             try {
@@ -185,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (e) {
                 showError(e.message);
+                outputArea.innerHTML = '';
             } finally {
                 submitButton.disabled = false;
             }
@@ -195,53 +203,55 @@ document.addEventListener('DOMContentLoaded', () => {
         function showResult(data) {
             const isMobile = window.innerWidth <= 600;
 
+            const cardHTML = `
+    <div class="result-card">
+        <div class="result-background-overlay" style="background-image: url('${data.thumbnail || ''}');"></div>
+        <div class="drag-handle"></div>
+        <div class="result-card-inner">
+            <div class="result-thumbnail-wrapper"></div>
+            <div class="result-info">
+                <h2>${data.title || 'Untitled'}</h2>
+                <p class="result-meta">${data.uploader || 'Unknown'} • ${data.duration || 'N/A'}</p>
+                <div class="download-status">
+                    Download started. If it doesn't begin, <a href="${data.download_url}" download="${data.filename}">click here</a>.
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+            outputArea.innerHTML = cardHTML;
+
+            const card = outputArea.querySelector('.result-card');
+            if (card) card.classList.remove('loading');
+
             if (isMobile) {
+                document.documentElement.style.overflow = 'hidden';
                 document.body.style.overflow = 'hidden';
-
-                outputArea.innerHTML = `
-                <div class="result-card">
-                    <div class="result-background-overlay" style="background-image: url('${data.thumbnail || ''}');"></div>
-                    <div class="drag-handle"></div>
-                    <div class="result-card-inner">
-                        <div class="result-thumbnail-wrapper"></div>
-                        <div class="result-info">
-                            <h2>${data.title || 'Untitled'}</h2>
-                            <p class="result-meta">${data.uploader || 'Unknown'} • ${data.duration || 'N/A'}</p>
-                            <div class="download-status">
-                                Download started. If it doesn't begin, <a href="${data.download_url}" download="${data.filename}">click here</a>.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-                setTimeout(() => {
-                    outputArea.classList.add('active');
-                    setupMobileDrag();
-                }, 10);
-            } else {
-                outputArea.innerHTML = `
-                <div class="result-card">
-                    <div class="result-background-overlay" style="background-image: url('${data.thumbnail || ''}');"></div>
-                    <div class="result-card-inner">
-                        <div class="result-thumbnail-wrapper"></div>
-                        <div class="result-info">
-                            <h2>${data.title || 'Untitled'}</h2>
-                            <p class="result-meta">${data.uploader || 'Unknown'} • ${data.duration || 'N/A'}</p>
-                            <div class="download-status">
-                                Download started. If it doesn't begin, <a href="${data.download_url}" download="${data.filename}">click here</a>.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+                document.body.style.position = 'fixed';
+                document.body.style.width = '100%';
+                document.body.style.height = '100%';
+                outputArea.classList.add('active');
+                setupMobileDrag();
             }
         }
 
         function showError(message) {
-            outputArea.classList.remove('active');
+            const existingError = document.querySelector('.error-box');
+            if (existingError) existingError.remove();
+
+            const errorBox = document.createElement('div');
+            errorBox.className = 'error-box';
+            errorBox.textContent = message;
+
+            const urlForm = document.querySelector('.url-form-container');
+            urlForm.insertAdjacentElement('afterend', errorBox);
+
+            document.documentElement.style.overflow = '';
             document.body.style.overflow = '';
-            outputArea.innerHTML = `<div class="error-box">${message}</div>`;
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
         }
 
         function setupMobileDrag() {
@@ -280,9 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 outputArea.style.transition = '';
 
                 if (diff > 100) {
-                    outputArea.classList.remove('active');
-                    document.body.style.overflow = '';
-                    outputArea.style.transform = '';
+                    closeMobileOverlay();
                 } else {
                     outputArea.style.transform = 'translateY(0)';
                 }
@@ -297,12 +305,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function closeMobileOverlay() {
+            document.documentElement.style.overflow = '';
             document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
 
             const backdrop = document.querySelector('.overlay-backdrop');
             outputArea.classList.remove('active');
             if (backdrop) {
                 backdrop.classList.remove('active');
+                setTimeout(() => backdrop.remove(), 300);
             }
             outputArea.style.transform = '';
         }
