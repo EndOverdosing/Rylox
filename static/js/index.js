@@ -183,24 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 showResult(data);
 
-                const a = document.createElement('a');
-                a.href = data.download_url;
-                a.download = data.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-
-                const isMobile = window.innerWidth <= 600;
-                if (!isMobile) {
-                    const a = document.createElement('a');
-                    a.href = data.download_url;
-                    a.download = data.filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                }
-
-
             } catch (e) {
                 showError(e.message);
                 outputArea.innerHTML = '';
