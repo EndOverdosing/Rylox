@@ -5,8 +5,7 @@ export const PREFS = config.preferences;
 
 export function proxyImage(url, origin) {
   if (!url) return null;
-  const full = url.replace("-large", "-t500x500");
-  return `${origin}/api/proxy/image?url=${encodeURIComponent(full)}`;
+  return url.replace("-large", "-t500x500");
 }
 
 export function proxyStream(url, origin) {
